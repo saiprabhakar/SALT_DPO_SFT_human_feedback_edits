@@ -1,0 +1,8 @@
+hg_secret
+__pycache__/
+*/__pycache__/
+data/*
+results/*
+.ipynb_checkpoints/
+.DS_Store
+*.zip
