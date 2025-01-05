@@ -6,3 +6,4 @@ results/*
 .ipynb_checkpoints/
 .DS_Store
 *.zip
+data/*/*/cache*

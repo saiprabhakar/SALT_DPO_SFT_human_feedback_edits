@@ -26,6 +26,7 @@ matplotlib = "^3.10.0"
 datasets = "^3.2.0"
 tensorboard = "^2.18.0"
 wandb = "^0.19.1"
+ipykernel = "^6.29.5"
 
 
 [build-system]
