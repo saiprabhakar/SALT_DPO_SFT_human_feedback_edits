@@ -47,35 +47,37 @@ class NeedlemanWunsch(OptimalAlignment):
         self._nmatrix[irow + 1][jcol + 1] = best_score
         return
 
-    
-def get_position_status(al_generated, 
-                        al_edited,
-                        S_generated_C_weight = 0,
-                        S_generated_D_weight = 1,
-                        S_generated_S_weight = 1,
-                        S_edited_C_weight = 1,
-                        S_edited_I_weight = 2,
-                        S_edited_S_weight = 2):
-    assert len(al_generated)==len(al_edited)
-    
-    #position_status = []
+
+def get_position_status(
+    al_generated,
+    al_edited,
+    S_generated_C_weight=0,
+    S_generated_D_weight=1,
+    S_generated_S_weight=1,
+    S_edited_C_weight=1,
+    S_edited_I_weight=2,
+    S_edited_S_weight=2,
+):
+    assert len(al_generated) == len(al_edited)
+
+    # position_status = []
     S_generated_position_weight = []
     S_edited_position_weight = []
-    
+
     for i in range(len(al_generated)):
         if al_generated[i] == al_edited[i]:
-            #position_status.append('C')
+            # position_status.append('C')
             S_generated_position_weight.append(S_generated_C_weight)
             S_edited_position_weight.append(S_edited_C_weight)
         elif al_generated[i] == -100:
-            #position_status.append('I')
+            # position_status.append('I')
             S_edited_position_weight.append(S_edited_I_weight)
         elif al_edited[i] == -100:
-            #position_status.append('D')
+            # position_status.append('D')
             S_generated_position_weight.append(S_generated_D_weight)
         else:
-            #position_status.append('S')
+            # position_status.append('S')
             S_generated_position_weight.append(S_generated_S_weight)
             S_edited_position_weight.append(S_edited_S_weight)
-            
+
     return S_generated_position_weight, S_edited_position_weight

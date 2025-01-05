@@ -1,6 +1,6 @@
 from transformers import HfArgumentParser
 import wandb
-from trainer import ScriptArguments, load_dataset, trainer
+from trainer.trainer import ScriptArguments, load_dataset, trainer
 
 parser = HfArgumentParser(ScriptArguments)
 

@@ -36,9 +36,9 @@ different human feedback approaches scalably
 ## Run training
 
 ```
-python DPO_trainer.py
-python SFT_trainer.py
-python SALT_trainer.py
+python train_DPO.py
+python train_SALT.py
+python train_SFT.py
 ```
 
 ## Citing SALT

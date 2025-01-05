@@ -27,7 +27,7 @@ if is_peft_available():
 from torch.nn.utils.rnn import pad_sequence
 
 from sequence_alignment import needle
-from metrics import AutomaticNgramEval
+from utils.metrics import AutomaticNgramEval
 
 ngram_eval = AutomaticNgramEval()
 

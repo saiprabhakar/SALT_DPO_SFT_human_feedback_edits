@@ -21,7 +21,7 @@ from peft import LoraConfig, get_peft_model
 
 # from torch.utils.data import DataLoader
 
-from dpo import DPOTrainer, SALTTrainer, SFTTrainer
+from trainer.dpo import DPOTrainer, SALTTrainer, SFTTrainer
 
 
 def extract_prompt(prompt_and_response):
