@@ -48,22 +48,23 @@ Key components of SALT include:
 ---
 
 ## Training
-Run the following scripts to train models:
 
+- Dummy Dataset: This repo uses the dummy example dataset in `data/avs/sub_eval_w_simulated_edits`
+- Run the following scripts to train models:
 - **Train DPO:**
   ```bash
   python train_DPO.py
   ```
-
 - **Train SALT:**
   ```bash
   python train_SALT.py
   ```
-
 - **Train SFT (Supervised Fine-Tuning):**
   ```bash
   python train_SFT.py
   ```
+- Simulated dataset can be found in https://huggingface.co/datasets/PrabhakarSai/after_visit_summary_simulated_edits
+    - refer the dataset card for instructions on using the dataset for this repo
 
 ---
 
@@ -86,6 +87,11 @@ In our training framework, we define:
 - **Edit Simulation:** Ground truth summaries are transformed to simulate human edits, reducing reliance on human feedback.
 
 During training, SALT optimizes the likelihood of chosen sentences while penalizing the unlikelihood of rejected sentences, guiding the model toward generating high-quality summaries.
+
+---
+## HG dataset
+- Simulated dataset can be found in https://huggingface.co/datasets/PrabhakarSai/after_visit_summary_simulated_edits
+    - refer the dataset card for instructions on using the dataset for this repo
 
 ---
 
