@@ -611,18 +611,23 @@ class DPOTrainer(BaseTrainer):
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
 
+        # if reference_free, we ignore the reference model and use a uniform reference
         if reference_free:
             ref_logratios = 0
 
+        # reward ratios
         logits = pi_logratios - ref_logratios
 
+        # DPO loss
         dpo_losses = -F.logsigmoid(self.beta * logits)
+        # we use the chosen and rejected log probabilities to compute the rewards for metrics
         chosen_rewards = (
             self.beta * (policy_chosen_logps - reference_chosen_logps).detach()
         )
         rejected_rewards = (
             self.beta * (policy_rejected_logps - reference_rejected_logps).detach()
         )
+        # mask out the rewards for the tokens that were padded, this is used for metrics
         rewards_mask = pi_logratios != 0
 
         return dpo_losses, chosen_rewards, rejected_rewards, rewards_mask
@@ -655,10 +660,12 @@ class DPOTrainer(BaseTrainer):
         # dummy token; we'll ignore the losses on these tokens later
         labels[labels == self.label_pad_token_id] = 0
 
+        # gather the logit for each labels
         per_token_logps = torch.gather(
             logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)
         ).squeeze(2)
 
+        # mask out the losses for the tokens that were padded
         if average_log_prob:
             return (per_token_logps * loss_mask).sum(-1) / loss_mask.sum(-1)
         else:
@@ -699,6 +706,8 @@ class DPOTrainer(BaseTrainer):
         train_eval: Literal["train", "eval"] = "train",
     ):
         """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
+
+        # run policy and reference models
         metrics = {}
 
         (
@@ -715,6 +724,7 @@ class DPOTrainer(BaseTrainer):
                 _,
             ) = self.concatenated_forward(self.ref_model, batch)
 
+        # compute DPO loss
         dpo_losses, chosen_rewards, rejected_rewards, rewards_mask = self.dpo_loss(
             policy_chosen_logps,
             policy_rejected_logps,
@@ -723,15 +733,11 @@ class DPOTrainer(BaseTrainer):
         )
         reward_accuracies = (chosen_rewards > rejected_rewards).float()
 
-        # if self.alignment_function == 'dpo':
+        # DPO loss + SFT loss
         losses = (-1) * self.alpha1 * policy_chosen_logps + self.alpha2 * dpo_losses
         losses = losses.mean()
-        # elif self.alignment_function == 'sft':
-        #     losses = (-1) * policy_chosen_logps
-        #     losses = losses.mean()
-        # elif self.alignment_function == 'salt':
-        #     losses = (-1) * self.omega1 * policy_chosen_salt_logps + (-1) * self.omega2 * policy_rejected_salt_logps
 
+        # store metrics
         prefix = "eval_" if train_eval == "eval" else ""
         metrics[f"{prefix}rewards/chosen"] = (
             chosen_rewards[rewards_mask].cpu().numpy().mean()
@@ -927,6 +933,14 @@ class SALTTrainer(BaseTrainer):
     def sequence_alignment(
         self, batch: Dict[str, Union[List, torch.LongTensor]]
     ) -> Dict[str, torch.LongTensor]:
+        """
+        Compute the salt weight for the chosen and rejected inputs, using the sequence alignment function and token level weights.
+
+        args:
+            batch: A batch of data. Must contain the keys 'chosen_input_ids' and 'rejected_input_ids', which are tensors of shape (batch_size, sequence_length).
+        returns:
+            A dictionary containing the salt weights for the chosen and rejected inputs under the keys 'chosen_salt_weight' and 'rejected_salt_weight'.
+        """
         rejected_salt_weight = []
         chosen_salt_weight = []
 
@@ -1060,6 +1074,16 @@ class SALTTrainer(BaseTrainer):
         labels_weight: torch.LongTensor,
         average_log_prob: bool = True,
     ) -> torch.FloatTensor:
+        """
+        Compute SALT weighted logps for the chosen responses.
+        args:
+            logits: Logits of the model (unnormalized). Shape: (batch_size, sequence_length, vocab_size)
+            labels: Labels for which to compute the log probabilities. Label tokens with a value of label_pad_token_id are ignored. Shape: (batch_size, sequence_length)
+            labels_weight: The weight of each token in the sequence alignment.
+            average_log_prob: If True, return the average log probability per (non-masked) token. Otherwise, return the sum of the log probabilities of the (non-masked) tokens.
+        returns:
+            A tensor of shape (batch_size,) containing the average/sum log probabilities of the given labels under the given logits.
+        """
         if logits.shape[:-1] != labels.shape:
             raise ValueError(
                 "Logits (batch and sequence length dim) and labels must have the same shape."
@@ -1072,10 +1096,12 @@ class SALTTrainer(BaseTrainer):
         # dummy token; we'll ignore the losses on these tokens later
         labels[labels == self.label_pad_token_id] = 0
 
+        # gather logits for labels
         per_token_logps = torch.gather(
             logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)
         ).squeeze(2)
 
+        # weight the log probabilities based on the chosen sentence's sequence alignment
         zero_for_here = torch.tensor(
             0, dtype=labels_weight.dtype, device=labels_weight.device
         )
@@ -1086,6 +1112,7 @@ class SALTTrainer(BaseTrainer):
         likelihood_weight = likelihood_weight * loss_mask
         per_token_logps = per_token_logps * likelihood_weight
 
+        # compute the average weighted log probability per (non-masked) token
         if average_log_prob:
             likelihood_token_num = (likelihood_weight != 0).sum()
             if likelihood_token_num == 0:
@@ -1149,10 +1176,12 @@ class SALTTrainer(BaseTrainer):
         one_minus_probs = 1.0 - probs
         one_minus_probs = one_minus_probs + (one_minus_probs == 0).float() * 1e-8
         log_one_minus_probs = torch.log(one_minus_probs)
+        # gather 1 - logits for labels
         unlikelihood_per_token_logps = torch.gather(
             log_one_minus_probs.log_softmax(-1), dim=2, index=labels.unsqueeze(2)
         ).squeeze(2)
 
+        # weight the log probabilities based on the rejected sentence's sequence alignment
         zero_for_here = torch.tensor(
             0, dtype=labels_weight.dtype, device=labels_weight.device
         )
@@ -1176,6 +1205,8 @@ class SALTTrainer(BaseTrainer):
         else:
             unlikelihood_per_token_logps = unlikelihood_per_token_logps.sum(-1).mean()
 
+        # compute the average weighted log probability per (non-masked) token
+        # add the likelihood and unlikelihood loss
         if calculate_liklihood_token_log_prob:
             return likelihood_per_token_logps + unlikelihood_per_token_logps
         else:
@@ -1207,7 +1238,7 @@ class SALTTrainer(BaseTrainer):
         chosen_logits = all_logits[: batch["chosen_input_ids"].shape[0]]
         rejected_logits = all_logits[batch["chosen_input_ids"].shape[0] :]
 
-        # if self.alignment_function in ['salt']:
+        # Find the logps for the chosen and rejected responses
         chosen_salt_logps = self._get_batch_chosen_salt_logps(
             chosen_logits,
             concatenated_batch["concatenated_labels"][
@@ -1453,10 +1484,12 @@ class SFTTrainer(BaseTrainer):
         # dummy token; we'll ignore the losses on these tokens later
         labels[labels == self.label_pad_token_id] = 0
 
+        # gather logits for the labels
         per_token_logps = torch.gather(
             logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)
         ).squeeze(2)
 
+        # compute the average/sum log probability per (non-masked) token
         if average_log_prob:
             return (per_token_logps * loss_mask).sum(-1) / loss_mask.sum(-1)
         else:

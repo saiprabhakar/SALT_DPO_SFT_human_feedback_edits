@@ -5,13 +5,17 @@ import string
 
 import numpy as np
 import nltk
+
 nltk.download("wordnet")
 from nltk.stem import porter
 from nltk.corpus import stopwords
 from rouge import Rouge
 from rouge_score import tokenize
 
+
 class Rouge(Rouge):
+    """Rouge metric class. Modified for handling bad inputs like empty sentences and white space sentences."""
+
     def _get_scores(self, hyps, refs):
         scores = []
         for hyp, ref in zip(hyps, refs):
@@ -86,6 +90,9 @@ class Rouge(Rouge):
 
 
 class AutomaticNgramEval:
+    """
+    Automatic N-gram evaluation class using the Rouge and Meteor metrics.
+    """
 
     def __init__(self):
         self.rouge_scorer = Rouge()
@@ -134,56 +141,10 @@ class AutomaticNgramEval:
             return {"rouge": rouge_score, "meteor": meteor_score}
 
 
-def make_triples(triples, all_v=True):
-    all_triples = []
-    for k, vs in triples.items():
-        for v in vs:
-            if all_v:
-                v = "%".join(v)
-            else:
-                v = v[-1]
-            all_triples.append("%".join([k, v]))
-    return all_triples
-
-
-def process_triples(summ, client):
-    processed_triples = {}
-
-    for triple in client.annotate(summ):
-        objs = []
-        subj = triple["subject"].lower()
-        subj_obj = triple["object"].lower()
-        obj_add = subj_obj
-        rel_add = triple["relation"].lower()
-
-        if subj in processed_triples:
-            objs = processed_triples[subj]
-        else:
-            processed_triples[subj] = []
-
-        subj_obj_words = subj_obj.split()
-        for rel, obj in objs:
-            obj_words = obj.split()
-            overlap = list(set(obj_words).intersection(subj_obj_words))
-
-            obj_based = len(overlap) / len(obj_words)
-            subj_obj_based = len(overlap) / len(subj_obj_words)
-
-            if obj_based >= 0.5 or subj_obj_based >= 0.5:
-                if subj_obj_based > obj_based:
-                    objs.remove((rel, obj))
-                    obj_add = subj_obj
-                    rel_add = rel
-                else:
-                    obj_add = None
-        if obj_add:
-            objs.append((rel_add, obj_add))
-
-        processed_triples[subj] = objs
-    return processed_triples
-
-
-class AutomaticFactEval:
+class AutomaticConceptEval:
+    """
+    Automatic fact evaluation class using the ROUGE and METEOR metrics on UMLS medical concepts extracted from the summaries.
+    """
 
     def __init__(self):
         return
@@ -311,6 +272,9 @@ def remove_stopword_and_punc_in_list(word_tokens):
 
 
 def cal_SAGE(x):
+    """
+    Compute SAGE metric as per the paper "Improving Summarization with Human Edits"
+    """
     # word_level
     pred_words = tokenize.tokenize(x["decoded_preds"], porter.PorterStemmer())
     pred_words = remove_stopword_and_punc_in_list(pred_words)
