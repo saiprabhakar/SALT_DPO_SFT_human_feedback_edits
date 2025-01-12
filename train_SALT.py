@@ -1,6 +1,6 @@
 from transformers import HfArgumentParser
 import wandb
-from trainer.trainer import ScriptArguments, load_dataset, trainer
+from trainer.trainer import ScriptArguments, load_dataset_hg_local, trainer
 
 parser = HfArgumentParser(ScriptArguments)
 
@@ -48,14 +48,14 @@ if script_args.report_to == "wandb":
     wandb.init(project=script_args.run_name)
 
 data_subset = "sub_eval_w_simulated_edits"
-train_dataset = load_dataset(
+train_dataset = load_dataset_hg_local(
     data_subset,
     sanity_check=script_args.sanity_check,
     alignment_function=script_args.alignment_function,
 )
 
 # 3. Load evaluation dataset
-eval_dataset = load_dataset(
+eval_dataset = load_dataset_hg_local(
     data_subset,
     sanity_check=True,
     alignment_function=script_args.alignment_function,

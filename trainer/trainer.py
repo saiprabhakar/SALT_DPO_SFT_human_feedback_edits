@@ -4,7 +4,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 import torch
-from datasets import Dataset, load_from_disk  # , load_dataset, load_metric
+from datasets import Dataset, load_from_disk
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -12,19 +12,18 @@ from transformers import (
     BitsAndBytesConfig,
 )
 
-# from transformers.trainer_utils import EvalPrediction# , EvalLoopOutput
-# from transformers.trainer_pt_utils import find_batch_size, nested_concat
-
-# import pandas as pd
-
-from peft import LoraConfig, get_peft_model
-
-# from torch.utils.data import DataLoader
-
+from peft import LoraConfig
 from trainer.dpo_salt_sft_trainer import DPOTrainer, SALTTrainer, SFTTrainer
 
 
 def extract_prompt(prompt_and_response):
+    """
+    Extract the prompt from the prompt and response string. This is done by searching for the hard coded string
+    args:
+        prompt_and_response: str - the prompt and response string
+    returns:
+        str: the prompt
+    """
     search_term = "\n\nGenerate the corresponding Discharge Instructions according to the input article:"
     search_term_idx = prompt_and_response.rfind(search_term)
     assert (
@@ -33,7 +32,7 @@ def extract_prompt(prompt_and_response):
     return prompt_and_response[: search_term_idx + len(search_term)]
 
 
-def load_dataset(
+def load_dataset_hg_local(
     split: str,
     sanity_check: bool = False,
     alignment_function: str = "sft",
@@ -51,6 +50,16 @@ def load_dataset(
 
     Prompts should be structured as follows:
       Conversation <prompt>\n\nSummary
+
+    args:
+        split: str - the split to load
+        sanity_check: bool - only load a small subset of the dataset
+        alignment_function: str - the alignment function to use
+        silent: bool - whether to print output
+        cache_dir: str - the cache directory to use
+
+    returns:
+        Dataset: the dataset
     """
     # dataset = load_dataset("Anthropic/hh-rlhf", split=split, cache_dir=cache_dir)
     if alignment_function in ["sft", "dpo", "salt"]:
@@ -241,6 +250,9 @@ class ScriptArguments:
 
 
 def trainer(script_args, train_dataset, eval_dataset):
+    """
+    Train a model using the DPO or SFT or SALT loss function.
+    """
     with open("hg_secret", "r") as f:
         hg_auth_token = f.read()
 
